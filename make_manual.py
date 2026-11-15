@@ -29,7 +29,8 @@ st.font.size = Pt(11)
 
 
 def h(text, level=1):
-    doc.add_heading(text, level=level)
+    par = doc.add_heading(text, level=level)
+    par.paragraph_format.keep_with_next = True
 
 
 def p(text, bold=False, italic=False):
@@ -49,6 +50,7 @@ def qa(i, q, a):
     par = doc.add_paragraph()
     r = par.add_run(f"Q{i}. {q}")
     r.bold = True
+    par.paragraph_format.keep_with_next = True
     doc.add_paragraph(a)
 
 
