@@ -1,0 +1,37 @@
+name: materialize-source
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify source archive
+        run: |
+          curl -fSL -o /tmp/src.zip "https://drive.google.com/uc?export=download&id=1ARVJv7A0fi-WegWYEhUo0hGAKV0toe9w"
+          echo "0c0ad937dc053dea390d21714fed4b58e45768361278eab7cfedd9f3e0da7de6  /tmp/src.zip" | sha256sum -c -
+      - name: Extract safely into repo root
+        run: |
+          python3 - <<'PY'
+          import zipfile, os, shutil
+          with zipfile.ZipFile('/tmp/src.zip') as z:
+              bad = z.testzip(); assert bad is None, bad
+              for n in z.namelist():
+                  p = os.path.normpath(n)
+                  assert p.startswith('FashionShift/') and '..' not in p.split(os.sep), n
+              z.extractall('/tmp/fsx')
+          root = os.environ['GITHUB_WORKSPACE']
+          src = '/tmp/fsx/FashionShift'
+          for item in os.listdir(src):
+              shutil.move(os.path.join(src, item), os.path.join(root, item))
+          shutil.copy('/tmp/src.zip', os.path.join(root, 'FashionShift_Complete.zip'))
+          PY
+      - name: Commit source tree
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Materialize FashionShift source tree from verified archive"
+          git push
