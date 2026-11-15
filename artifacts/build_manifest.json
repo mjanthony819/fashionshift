@@ -1,0 +1,13 @@
+{
+  "index_html": {
+    "bytes": 2453429,
+    "sha256": "37bb577f08de9732ea52d8f60cd35270a7fc33f9006de63a41a38a1cc2ec1880"
+  },
+  "weights_json": {
+    "bytes": 2250207,
+    "sha256": "472a5fdc3228eca4568c2e5dc0459d62f16c587296cad249fe430187808f31ea"
+  },
+  "metrics_json_sha256": "18de58a3071b2269575938d8dcab1c11bd6e7c6705749babd9561fed72d38354",
+  "gallery_count": 96,
+  "failure_count": 36
+}
