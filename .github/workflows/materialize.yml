@@ -20,7 +20,7 @@ jobs:
               bad = z.testzip(); assert bad is None, bad
               for n in z.namelist():
                   p = os.path.normpath(n)
-                  assert p.startswith('FashionShift/') and '..' not in p.split(os.sep), n
+                  assert p == 'FashionShift' or (p.startswith('FashionShift/') and '..' not in p.split(os.sep)), n
               z.extractall('/tmp/fsx')
           root = os.environ['GITHUB_WORKSPACE']
           src = '/tmp/fsx/FashionShift'
