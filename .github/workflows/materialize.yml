@@ -25,7 +25,12 @@ jobs:
           root = os.environ['GITHUB_WORKSPACE']
           src = '/tmp/fsx/FashionShift'
           for item in os.listdir(src):
-              shutil.move(os.path.join(src, item), os.path.join(root, item))
+              dest = os.path.join(root, item)
+              if os.path.isdir(dest):
+                  shutil.rmtree(dest)
+              elif os.path.exists(dest):
+                  os.remove(dest)
+              shutil.move(os.path.join(src, item), dest)
           shutil.copy('/tmp/src.zip', os.path.join(root, 'FashionShift_Complete.zip'))
           PY
       - name: Commit source tree
@@ -33,5 +38,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Materialize complete bundle: demo video, narration, shots, keep-together manual"
+          git commit -m "Fix nested demo/docs dirs; materialize complete bundle"
           git push
