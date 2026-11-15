@@ -60,10 +60,10 @@ t.alignment = WD_ALIGN_PARAGRAPH.CENTER
 r = t.add_run("\n\nFashionShift\n")
 r.font.size = Pt(40)
 r.bold = True
-r.font.color.rgb = RGBColor(0x1F, 0x4E, 0x79)
+r.font.color.rgb = RGBColor(0x25, 0x31, 0x19)
 s = doc.add_paragraph()
 s.alignment = WD_ALIGN_PARAGRAPH.CENTER
-s.add_run("A vision-model audit workbench for Fashion-MNIST\n\n"
+s.add_run("Classify and route garments through a simulated sorting gate, then audit the models - a Fashion-MNIST lab\n\n"
           "Project manual and interview preparation\n"
           "Build Your First AI App hackathon (Devpost)\n\n"
           "M J Anthony\nNovember 2026\n\n"
@@ -194,13 +194,22 @@ h("8. The app (engineering)")
 bullets([
     "One 2.3 MB HTML file: weights (f32, base64), 96-image test gallery, 36-image failure "
     "gallery, all metrics, all code. No server, no CDN, no analytics.",
+    "Classify a garment (first tab): drop any PNG/JPG, see exactly what the models see "
+    "(grayscale, center-crop, 28x28, optional invert), and get all three model calls with "
+    "confidence, live in the browser. CSV batch import (784 columns + optional label) runs "
+    "the same models over a whole file with strict validation before anything runs. A sorting "
+    "gate (chosen model + confidence threshold) then routes every result: AUTO-SORT into the "
+    "predicted class bin when confidence clears the gate, otherwise MANUAL REVIEW. Single "
+    "images get a routing banner with per-model routing chips; CSV batches get a routing "
+    "column, a per-bin routing summary with the manual-review share, and a downloadable "
+    "routing CSV. The gate is a benchmark-data simulator: it demonstrates confidence-gated "
+    "routing logic, not factory-ready QC - under distribution shift the models stay "
+    "confidently wrong, so a real gate would misroute exactly when it looks sure.",
     "Live bench: random test images, three model chips each, abstain-threshold slider, "
     "batch accuracy readout.",
     "Evidence tab: metrics table, confusion matrix, per-class F1, reliability diagram, "
     "coverage-risk chart, real failure gallery.",
     "Stress lab: blur / occlusion / translation applied live in JS with immediate re-inference.",
-    "Import: PNG/JPG pipeline (grayscale, center-crop, 28x28, optional invert) and CSV batch "
-    "import (784 columns + optional label) with strict validation before anything runs.",
     "Session history in localStorage only; one-click model card and metrics.json export.",
     "Parity: tests/parity_check.js compares JS inference against PyTorch on 48 test images x "
     "3 models - 1,440 probabilities, max abs error 1e-6.",
