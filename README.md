@@ -30,6 +30,11 @@ and the interface moved from a stock dark theme to the project's charcoal/lime
 design. Models, data, metrics and evaluation are unchanged. The narrated demo under `demo/` was recorded for
 the original submission and shows its earlier interface.
 
+`FashionShift_Complete.zip` in this repository is the **original submission
+bundle** (pre-repair interface), kept for the record. The updated complete
+bundle - repaired app, refreshed manuals, tests and the original demo - is
+distributed separately.
+
 ## What it shows
 
 | Model | Accuracy | Macro F1 | NLL | Brier | ECE |
