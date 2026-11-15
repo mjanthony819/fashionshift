@@ -14,6 +14,22 @@ Built for the *Build Your First AI App* hackathon (Devpost). Built with AI assis
 Open `index.html` in any modern browser — no server, no install, no network needed.
 (Or visit the GitHub Pages deployment linked from the repository page.)
 
+The first tab is **Classify a garment**: drop in any PNG/JPG (or a CSV batch of
+784-value rows) and all three trained models classify it live in your browser,
+showing exactly what the models see. A **sorting gate** (chosen model +
+confidence threshold) then routes every result: AUTO-SORT into the predicted
+class bin when confidence clears the gate, otherwise MANUAL REVIEW. CSV batches
+also get a routing column, a per-bin routing summary with the manual-review
+share, and a downloadable routing CSV. The gate is a benchmark-data simulator -
+it demonstrates confidence-gated routing logic, not factory-ready QC. The
+bench, evidence and stress tabs audit those same models afterwards.
+
+**Update, November 16, 2026:** the app was reworked so the trained models drive
+the main workflow end to end (classify-first, with sorting-gate routing added)
+and the interface moved from a stock dark theme to the project's charcoal/lime
+design. Models, data, metrics and evaluation are unchanged. The narrated demo under `demo/` was recorded for
+the original submission and shows its earlier interface.
+
 ## What it shows
 
 | Model | Accuracy | Macro F1 | NLL | Brier | ECE |
