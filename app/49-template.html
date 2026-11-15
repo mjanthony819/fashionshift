@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FashionShift — classify a garment, then audit the models</title>
+<style>
+:root{
+  --bg:#f5f6f3; --panel:#ffffff; --panel2:#eef1e8; --line:#e3e6df;
+  --text:#232922; --dim:#747c72; --faint:#9ea798;
+  --accent:#3d5a1f; --good:#3d5a1f; --bad:#b84036; --warn:#b07d2b;
+  --lime:#c3ee69; --lime-deep:#acd455; --charcoal:#202520; --deep:#253119;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent);text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 64px}
+header{background:var(--charcoal);border-radius:10px;padding:22px 20px 16px;margin-top:18px;color:#f5f6f3}
+header .sub{color:#d9dfd4}
+h1{font-size:26px;letter-spacing:.3px}
+h1 .shift{color:var(--lime)}
+.sub{color:var(--dim);margin-top:4px;font-size:14px}
+.banner{margin:14px 0;padding:10px 14px;border:1px solid var(--warn);border-radius:8px;color:var(--warn);background:rgba(176,125,43,.08);font-size:13px}
+.tabs{display:flex;gap:4px;margin:18px 0 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{background:none;border:none;color:var(--dim);font-size:15px;padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent}
+.tabs button.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;overflow-x:auto}
+.card h2{font-size:17px;margin-bottom:10px}
+.card h3{font-size:14px;color:var(--dim);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.sample{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+.sample canvas{width:84px;height:84px;image-rendering:pixelated;border-radius:4px;background:#000}
+.sample .truth{font-size:12px;color:var(--dim);margin:4px 0 6px}
+.chip{display:block;font-size:11px;margin:2px 0;padding:2px 6px;border-radius:10px;background:var(--panel2);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.ok{color:var(--good)}
+.chip.bad{color:var(--bad)}
+.chip.abstain{opacity:.35}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:rgba(195,238,105,.18)}
+.btn{background:var(--lime);color:var(--deep);border:1px solid var(--lime-deep);border-radius:7px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:8px 0}
+label{font-size:13px;color:var(--dim)}
+input[type=range]{accent-color:var(--accent)}
+.sliderVal{font-variant-numeric:tabular-nums;color:var(--text);min-width:44px;display:inline-block;font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+canvas.chart{width:100%;background:var(--panel2);border-radius:8px;border:1px solid var(--line)}
+.muted{color:var(--faint);font-size:13px}
+.kpi{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:4px 8px 4px 0;text-align:center;min-width:120px}
+.kpi .v{display:block;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--dim);cursor:pointer}
+.drop:hover{border-color:var(--accent);color:var(--text)}
+.err{background:rgba(184,64,54,.08);border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:10px 14px;font-size:13px;margin:8px 0;white-space:pre-wrap}
+pre.card-md{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;font-size:12.5px;overflow:auto;white-space:pre-wrap;line-height:1.55}
+.tag{display:inline-block;background:var(--panel2);color:var(--dim);border-radius:10px;padding:1px 9px;font-size:11px;margin-right:5px}
+.confbar{height:5px;border-radius:3px;background:var(--panel2);margin-top:2px}
+.confbar>i{display:block;height:100%;border-radius:3px;background:var(--lime-deep)}
+footer{margin-top:34px;color:var(--faint);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Fashion<span class="shift">Shift</span></h1>
+  <div class="sub">Classify a garment image with three trained models, right in your browser - then see exactly how well they work: clean accuracy, calibration, abstention, and behaviour when the images shift.</div>
+</header>
+<div class="banner">Benchmark scope: 28&times;28 grayscale clothing photos from Fashion-MNIST (MIT license, Zalando Research). This is a model-audit bench, <b>not</b> a real-world photo classifier or a shopping recommender.</div>
+<nav class="tabs">
+  <button data-tab="import" class="active">Classify a garment</button>
+  <button data-tab="bench">Live bench</button>
+  <button data-tab="evidence">Evidence</button>
+  <button data-tab="stress">Stress lab</button>
+  <button data-tab="card">Model card</button>
+</nav>
+
+<!-- ============ BENCH ============ -->
+<section id="bench" class="panel">
+  <div class="card">
+    <h2>Live bench</h2>
+    <p class="muted">Random images from the untouched 10,000-image official test set. Top line is the dataset truth; chips show each model's call. Inference runs in your browser right now (weights embedded, nothing leaves the page). Raise the abstain threshold and low-confidence calls go grey.</p>
+    <div class="row">
+      <label for="thresh">Abstain below confidence</label>
+      <input type="range" id="thresh" min="0" max="0.99" step="0.01" value="0">
+      <span class="sliderVal" id="threshVal">0.00</span>
+      <button class="btn ghost" id="reshuffle">New batch</button>
+      <span class="muted" id="benchStats"></span>
+    </div>
+    <div class="grid" id="benchGrid"></div>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section id="evidence" class="panel">
+  <div class="card">
+    <h2>Measured results — untouched official test set (10,000 images)</h2>
+    <table id="metricsTable"><thead><tr>
+      <th>Model</th><th class="num">Accuracy</th><th class="num">Macro F1</th><th class="num">NLL</th><th class="num">Brier</th><th class="num">ECE</th><th class="num">Params</th>
+    </tr></thead><tbody></tbody></table>
+    <p class="muted" style="margin-top:8px">NLL = negative log-likelihood, ECE = expected calibration error (15 bins). Lower is better for NLL, Brier, ECE. The augmented CNN trades a little clean accuracy for translation robustness — see the stress lab.</p>
+  </div>
+  <div class="two">
+    <div class="card"><h2>Confusion matrix</h2>
+      <div class="row"><label>Model</label><select id="cmModel"></select></div>
+      <canvas class="chart" id="cmCanvas" width="520" height="440"></canvas>
+    </div>
+    <div class="card"><h2>Per-class F1</h2>
+      <div class="row"><label>Model</label><select id="pcModel"></select></div>
+      <canvas class="chart" id="pcCanvas" width="520" height="440"></canvas>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card"><h2>Calibration (reliability)</h2>
+      <div class="row"><label>Model</label><select id="calModel"></select></div>
+      <canvas class="chart" id="calCanvas" width="520" height="380"></canvas>
+      <p class="muted">Bars: mean confidence per bin. Line: actual accuracy. A calibrated model hugs the diagonal.</p>
+    </div>
+    <div class="card"><h2>Coverage vs risk (abstention)</h2>
+      <canvas class="chart" id="crCanvas" width="520" height="380"></canvas>
+      <p class="muted">Error rate on the kept predictions as the confidence threshold rises. Confidence helps — but it is not a safety net (see stress lab).</p>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Failure gallery</h2>
+    <p class="muted">Real misclassifications from the untouched test set (augmented CNN). Shirt vs T-shirt/top vs Pullover confusions dominate — the weak classes in every model.</p>
+    <div class="grid" id="failGrid"></div>
+  </div>
+</section>
+
+<!-- ============ STRESS LAB ============ -->
+<section id="stress" class="panel">
+  <div class="card">
+    <h2>Stress lab — damage the input, watch the models</h2>
+    <p class="muted">Apply a perturbation to a live batch of test images. Inference re-runs in your browser immediately. The full-audit numbers below were measured over all 10,000 test images during evaluation (seeded, reproducible).</p>
+    <div class="row">
+      <label><input type="radio" name="pert" value="none" checked> none</label>
+      <label><input type="radio" name="pert" value="blur"> blur 3&times;3</label>
+      <label><input type="radio" name="pert" value="occlusion"> occlusion</label>
+      <label><input type="radio" name="pert" value="translation"> translation</label>
+      <button class="btn ghost" id="stressReseed">Re-randomize</button>
+    </div>
+    <div class="row" id="occlRow" style="display:none">
+      <label>Block size</label><input type="range" id="occlSize" min="4" max="14" step="1" value="8"><span class="sliderVal" id="occlSizeVal">8px</span>
+    </div>
+    <div class="row" id="transRow" style="display:none">
+      <label>Shift X</label><input type="range" id="dx" min="-6" max="6" step="1" value="3"><span class="sliderVal" id="dxVal">+3</span>
+      <label>Shift Y</label><input type="range" id="dy" min="-6" max="6" step="1" value="-2"><span class="sliderVal" id="dyVal">-2</span>
+    </div>
+    <div class="row" id="stressKpis"></div>
+    <div class="grid" id="stressGrid"></div>
+  </div>
+  <div class="card">
+    <h2>Full-test stress audit (10,000 images, seeded)</h2>
+    <table id="stressTable"><thead><tr>
+      <th>Perturbation</th><th>Model</th><th class="num">Accuracy</th><th class="num">Macro F1</th><th class="num">Mean conf (correct)</th><th class="num">Mean conf (wrong)</th>
+    </tr></thead><tbody></tbody></table>
+    <p class="muted" style="margin-top:8px">Key finding: confidence stays high even when the model is wrong under stress — abstaining on confidence alone does not catch shifted inputs.</p>
+  </div>
+</section>
+
+<!-- ============ IMPORT ============ -->
+<section id="import" class="panel active">
+  <div class="card">
+    <h2>Classify a garment image</h2>
+    <p class="muted">Any PNG or JPG. The pipeline shows exactly what the models see: grayscale, centered, scaled to 28&times;28. White-on-dark is expected; tick invert if your sketch is dark-on-light.</p>
+    <div class="row">
+      <div class="drop" id="imgDrop">Drop an image here or click to choose<input type="file" id="imgFile" accept="image/*" hidden></div>
+    </div>
+    <div class="row" id="imgCtl" style="display:none">
+      <canvas id="importPreview" width="112" height="112" style="image-rendering:pixelated;background:#000;border-radius:6px"></canvas>
+      <label><input type="checkbox" id="invert"> invert colors</label>
+      <button class="btn" id="runImport">Run all three models</button>
+    </div>
+    <div class="row" id="importResult"></div>
+    <div class="card" style="background:var(--panel2)"><h3>What this can and cannot tell you</h3>
+      <p class="muted">The models know ten classes of 28&times;28 grayscale catalog clothing photos. A phone photo, a drawing, or a different garment style is out of distribution: expect confident nonsense. That is exactly the behaviour this workbench exists to expose.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Batch import (CSV)</h2>
+    <p class="muted">One image per row: 784 comma-separated pixel values 0–255, optionally followed by a true label 0–9 (header row allowed). Validated before anything runs.</p>
+    <div class="row"><div class="drop" id="csvDrop">Drop a CSV here or click to choose<input type="file" id="csvFile" accept=".csv,text/csv" hidden></div></div>
+    <div id="csvErr"></div>
+    <div id="csvResult"></div>
+  </div>
+  <div class="card">
+    <h2>Session history</h2>
+    <p class="muted">Saved in your browser only (localStorage). Nothing is uploaded anywhere.</p>
+    <div class="row"><button class="btn ghost" id="clearHist">Clear history</button></div>
+    <table id="histTable"><thead><tr><th>When</th><th>Kind</th><th>Detail</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ============ MODEL CARD ============ -->
+<section id="card" class="panel">
+  <div class="card">
+    <h2>Model card</h2>
+    <div class="row">
+      <button class="btn" id="dlMd">Download model_card.md</button>
+      <button class="btn ghost" id="dlJson">Download metrics.json</button>
+    </div>
+    <pre class="card-md" id="cardMd"></pre>
+  </div>
+</section>
+
+<footer>
+  FashionShift · built with PyTorch (training) and hand-written JS inference (this page) · Fashion-MNIST © Zalando Research, MIT License · models trained on a 50k/10k split of the official training set; the official 10k test set stayed untouched until evaluation · built with AI assistance, disclosed on the project page.
+</footer>
+</div>
+
+<script id="fs-data" type="application/json">{"weights":__WEIGHTS__,"metrics":__METRICS__,"gallery":__GALLERY__,"failures":__FAILURES__}</script>
+<script>__INFERENCE_JS__</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("fs-data").textContent);
+const CLASSES = DATA.metrics.classes;
+const MODELS = {lr: FSInference.decodeModel(DATA.weights.models.lr),
+                cnn: FSInference.decodeModel(DATA.weights.models.cnn),
+                cnn_aug: FSInference.decodeModel(DATA.weights.models.cnn_aug)};
+const MODEL_LABEL = {lr:"Logistic reg.", cnn:"CNN", cnn_aug:"CNN + aug"};
+const $ = s => document.querySelector(s);
+
+function decodePixels(b64){
+  const bin = atob(b64); const px = new Float32Array(784);
+  for(let i=0;i<784;i++) px[i]=bin.charCodeAt(i)/255;
+  return px;
+}
+function drawPixels(canvas, px, size){
+  canvas.width = size||112; canvas.height = size||112;
+  const ctx = canvas.getContext("2d");
+  const off = document.createElement("canvas"); off.width=28; off.height=28;
+  const octx = off.getContext("2d");
+  const img = octx.createImageData(28,28);
+  for(let i=0;i<784;i++){const v=Math.max(0,Math.min(255,Math.round(px[i]*255)));
+    img.data[i*4]=v; img.data[i*4+1]=v; img.data[i*4+2]=v; img.data[i*4+3]=255;}
+  octx.putImageData(img,0,0);
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(off,0,0,canvas.width,canvas.height);
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x===b));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===b.dataset.tab));
+    if(b.dataset.tab==="evidence") drawEvidence();
+    if(b.dataset.tab==="stress"){populateStressTable();runStress();}
+  };
+});
+
+/* ---------- bench ---------- */
+let gallery = DATA.gallery.map(g=>({...g, px:null}));
+let batch = [];
+function pickBatch(n){
+  const idx = new Set();
+  while(idx.size<n) idx.add(Math.floor(Math.random()*gallery.length));
+  return [...idx].map(i=>gallery[i]);
+}
+function galleryPx(g){ if(!g.px) g.px = decodePixels(g.p); return g.px; }
+function chipHtml(label, r, thresh){
+  const abst = r.conf < thresh;
+  const ok = r.pred===label;
+  return `<span class="chip ${abst?"abstain":(ok?"ok":"bad")}" title="${MODEL_LABEL? "":""}">${r.name}: ${abst?"abstain":CLASSES[r.pred]} · ${(r.conf*100).toFixed(0)}%</span>`;
+}
+function renderBench(){
+  const thresh = parseFloat($("#thresh").value);
+  $("#threshVal").textContent = thresh.toFixed(2);
+  const grid = $("#benchGrid"); grid.innerHTML="";
+  let stats = {lr:[0,0],cnn:[0,0],cnn_aug:[0,0]};
+  for(const g of batch){
+    const px = galleryPx(g);
+    const div = document.createElement("div"); div.className="sample";
+    const cv = document.createElement("canvas"); div.appendChild(cv); drawPixels(cv,px,84);
+    let html = `<div class="truth">truth: ${CLASSES[g.y]}</div>`;
+    for(const m of ["lr","cnn","cnn_aug"]){
+      const r = MODELS[m] ? FSInference.predict(MODELS[m], px) : null;
+      r.name = MODEL_LABEL[m];
+      if(r.conf>=thresh){ stats[m][1]++; if(r.pred===g.y) stats[m][0]++; }
+      html += chipHtml(g.y, r, thresh);
+    }
+    div.insertAdjacentHTML("beforeend", html);
+    grid.appendChild(div);
+  }
+  $("#benchStats").textContent = ["lr","cnn","cnn_aug"].map(m=>{
+    const [c,n]=stats[m]; return `${MODEL_LABEL[m]} ${n?Math.round(100*c/n)+"% of "+n:"all abstained"}`;
+  }).join(" · ");
+}
+$("#reshuffle").onclick=()=>{batch=pickBatch(24);renderBench();};
+$("#thresh").oninput=renderBench;
+
+/* ---------- evidence ---------- */
+function fmt(x,d){return x==null?"—":Number(x).toFixed(d===undefined?4:d);}
+function drawEvidence(){
+  const tb = $("#metricsTable tbody");
+  if(!tb.dataset.done){
+    for(const m of ["lr","cnn","cnn_aug"]){
+      const r = DATA.metrics.models[m];
+      tb.insertAdjacentHTML("beforeend",`<tr${m==="cnn_aug"?' class="hl"':""}><td>${MODEL_LABEL[m]}</td><td class="num">${fmt(r.accuracy)}</td><td class="num">${fmt(r.macro_f1)}</td><td class="num">${fmt(r.nll)}</td><td class="num">${fmt(r.brier)}</td><td class="num">${fmt(r.ece)}</td><td class="num">${(r.params||0).toLocaleString()}</td></tr>`);
+    }
+    tb.dataset.done="1";
+    populateStressTable();
+    for(const id of ["cmModel","pcModel","calModel"]){
+      const sel=$("#"+id);
+      for(const m of ["lr","cnn","cnn_aug"]) sel.insertAdjacentHTML("beforeend",`<option value="${m}"${m==="cnn_aug"?" selected":""}>${MODEL_LABEL[m]}</option>`);
+      sel.onchange=drawEvidence;
+    }
+    // failure gallery
+    const fg=$("#failGrid");
+    for(const f of DATA.failures){
+      const px=decodePixels(f.p);
+      const div=document.createElement("div");div.className="sample";
+      const cv=document.createElement("canvas");div.appendChild(cv);drawPixels(cv,px,84);
+      div.insertAdjacentHTML("beforeend",`<div class="truth">truth: ${CLASSES[f.y]}</div><span class="chip bad">said: ${CLASSES[f.pred]} · ${(f.conf*100).toFixed(0)}%</span>`);
+      fg.appendChild(div);
+    }
+  }
+  drawConfusion($("#cmModel").value);
+  drawPerClass($("#pcModel").value);
+  drawCalib($("#calModel").value);
+  drawCoverage();
+}
+let stressTableDone=false;
+function populateStressTable(){
+  if(stressTableDone)return;stressTableDone=true;
+  const st=$("#stressTable tbody");
+  const P={blur:"Blur 3×3",occlusion:"Occlusion 8×8",translation:"Translation ±4px"};
+  for(const s of ["blur","occlusion","translation"]){
+    for(const m of ["lr","cnn","cnn_aug"]){
+      const r=DATA.metrics.stress[s][m];
+      st.insertAdjacentHTML("beforeend",`<tr><td>${P[s]}</td><td>${MODEL_LABEL[m]}</td><td class="num">${fmt(r.accuracy)}</td><td class="num">${fmt(r.macro_f1)}</td><td class="num">${fmt(r.mean_confidence_correct,3)}</td><td class="num">${fmt(r.mean_confidence_wrong,3)}</td></tr>`);
+    }
+  }
+}
+const CLASS_SHORT=["T-shirt","Trouser","Pullover","Dress","Coat","Sandal","Shirt","Sneaker","Bag","Boot"];
+function drawConfusion(m){
+  const cm=DATA.metrics.models[m].confusion;
+  const cv=$("#cmCanvas"),ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height,pad=68,cell=Math.min((W-pad-8)/10,(H-pad-8)/10);
+  ctx.clearRect(0,0,W,H);ctx.font="11px sans-serif";
+  let mx=1;cm.forEach(r=>r.forEach(v=>{if(v>mx)mx=v;}));
+  for(let i=0;i<10;i++){
+    ctx.fillStyle="#747c72";ctx.textAlign="right";ctx.fillText(CLASS_SHORT[i],pad-6,pad+i*cell+cell/2+4);
+    ctx.textAlign="center";ctx.fillText(CLASS_SHORT[i],pad+i*cell+cell/2,pad-8);
+    for(let j=0;j<10;j++){
+      const v=cm[i][j],a=v/mx;
+      ctx.fillStyle=i===j?`rgba(61,90,31,${.12+.75*a})`:`rgba(184,64,54,${.06+.8*a})`;
+      ctx.fillRect(pad+j*cell,pad+i*cell,cell-1,cell-1);
+      if(v>0){ctx.fillStyle=a>.5?"#fff":"#747c72";ctx.fillText(v,pad+j*cell+cell/2,pad+i*cell+cell/2+4);}
+    }
+  }
+}
+function drawPerClass(m){
+  const pc=DATA.metrics.models[m].per_class;
+  const cv=$("#pcCanvas"),ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height,pad=80,bh=(H-30)/10;
+  ctx.clearRect(0,0,W,H);ctx.font="12px sans-serif";
+  pc.forEach((c,i)=>{
+    const y=10+i*bh;
+    ctx.fillStyle="#747c72";ctx.textAlign="right";ctx.fillText(c.class,pad-8,y+bh/2+4);
+    ctx.fillStyle=c.f1<0.75?"#b84036":c.f1<0.9?"#b07d2b":"#3d5a1f";
+    ctx.fillRect(pad,y+3,(W-pad-60)*c.f1,bh-7);
+    ctx.fillStyle="#232922";ctx.textAlign="left";ctx.fillText(fmt(c.f1,3),pad+(W-pad-60)*c.f1+6,y+bh/2+4);
+  });
+}
+function drawCalib(m){
+  const bins=DATA.metrics.models[m].ece_bins;
+  const cv=$("#calCanvas"),ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height,pad=44,pw=W-pad-14,ph=H-pad-26;
+  ctx.clearRect(0,0,W,H);ctx.font="11px sans-serif";
+  ctx.strokeStyle="#e3e6df";ctx.strokeRect(pad,14,pw,ph);
+  ctx.setLineDash([4,4]);ctx.strokeStyle="#3d5a1f";ctx.beginPath();
+  ctx.moveTo(pad,14+ph);ctx.lineTo(pad+pw,14);ctx.stroke();ctx.setLineDash([]);
+  const bw=pw/bins.length;
+  bins.forEach((b,i)=>{
+    if(!b.n)return;
+    const x=pad+i*bw;
+    ctx.fillStyle="rgba(113,154,48,.55)";
+    const ch=b.conf*ph;ctx.fillRect(x+2,14+ph-ch,bw-4,ch);
+    const ay=14+ph-b.acc*ph;
+    ctx.fillStyle="#b84036";ctx.beginPath();ctx.arc(x+bw/2,ay,3.4,0,7);ctx.fill();
+    ctx.fillStyle="#9ea798";ctx.textAlign="center";if(i%2===0)ctx.fillText(b.hi.toFixed(1),x+bw/2,H-8);
+    ctx.save();ctx.translate(x+bw/2,14+ph-3);ctx.rotate(-Math.PI/2);ctx.textAlign="right";ctx.fillStyle="rgba(35,41,34,.5)";ctx.fillText("n="+b.n,0,-3);ctx.restore();
+  });
+  ctx.fillStyle="#3d5a1f";ctx.textAlign="left";ctx.fillText("perfect calibration",pad+6,26);
+}
+function drawCoverage(){
+  const cv=$("#crCanvas"),ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height,pad=44,pw=W-pad-14,ph=H-pad-26;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle="#e3e6df";ctx.strokeRect(pad,14,pw,ph);
+  const colors={lr:"#9ea798",cnn:"#719a30",cnn_aug:"#3d5a1f"};
+  let maxRisk=0.0001;
+  for(const m of ["lr","cnn","cnn_aug"])for(const p of DATA.metrics.models[m].coverage_risk)if(p.risk!=null&&p.risk>maxRisk)maxRisk=p.risk;
+  ctx.font="11px sans-serif";
+  for(let g=0;g<=4;g++){const v=maxRisk*g/4;const y=14+ph-(v/maxRisk)*ph;
+    ctx.fillStyle="#9ea798";ctx.textAlign="right";ctx.fillText((v*100).toFixed(1)+"%",pad-6,y+4);}
+  for(const m of ["lr","cnn","cnn_aug"]){
+    const curve=DATA.metrics.models[m].coverage_risk.filter(p=>p.risk!=null);
+    ctx.strokeStyle=colors[m];ctx.lineWidth=2;ctx.beginPath();
+    curve.forEach((p,i)=>{const x=pad+p.threshold/0.99*pw,y=14+ph-(p.risk/maxRisk)*ph;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.stroke();
+  }
+  let lx=pad+10;ctx.textAlign="left";
+  for(const m of ["lr","cnn","cnn_aug"]){ctx.fillStyle=colors[m];ctx.fillText(MODEL_LABEL[m],lx,28);lx+=95;}
+  ctx.fillStyle="#9ea798";ctx.fillText("threshold →",pad+pw-70,H-8);
+}
+
+/* ---------- stress lab ---------- */
+let stressBatch=[];
+function perturb(px){
+  const kind=document.querySelector("input[name=pert]:checked").value;
+  if(kind==="blur")return FSInference.blur3x3(px);
+  if(kind==="occlusion"){
+    const s=parseInt($("#occlSize").value);
+    const r=Math.floor(Math.random()*(28-s)),c=Math.floor(Math.random()*(28-s));
+    return FSInference.occlude(px,r,c,s);
+  }
+  if(kind==="translation")return FSInference.translate(px,parseInt($("#dy").value),parseInt($("#dx").value));
+  return px;
+}
+function runStress(){
+  if(!stressBatch.length)stressBatch=pickBatch(24);
+  $("#occlRow").style.display=$("input[name=pert]:checked")&&document.querySelector("input[name=pert]:checked").value==="occlusion"?"flex":"none";
+  $("#transRow").style.display=document.querySelector("input[name=pert]:checked").value==="translation"?"flex":"none";
+  $("#occlSizeVal").textContent=$("#occlSize").value+"px";
+  $("#dxVal").textContent=(parseInt($("#dx").value)>=0?"+":"")+$("#dx").value;
+  $("#dyVal").textContent=(parseInt($("#dy").value)>=0?"+":"")+$("#dy").value;
+  const grid=$("#stressGrid");grid.innerHTML="";
+  const acc={lr:[0,0],cnn:[0,0],cnn_aug:[0,0]},confW={lr:[],cnn:[],cnn_aug:[]};
+  const cleanAcc=DATA.metrics.models;
+  for(const g of stressBatch){
+    const px=perturb(galleryPx(g));
+    const div=document.createElement("div");div.className="sample";
+    const cv=document.createElement("canvas");div.appendChild(cv);drawPixels(cv,px,84);
+    let html=`<div class="truth">truth: ${CLASSES[g.y]}</div>`;
+    for(const m of ["lr","cnn","cnn_aug"]){
+      const r=FSInference.predict(MODELS[m],px);r.name=MODEL_LABEL[m];
+      acc[m][1]++;if(r.pred===g.y)acc[m][0]++;else confW[m].push(r.conf);
+      html+=chipHtml(g.y,r,0);
+    }
+    div.insertAdjacentHTML("beforeend",html);grid.appendChild(div);
+  }
+  $("#stressKpis").innerHTML=["lr","cnn","cnn_aug"].map(m=>{
+    const a=acc[m][0]/acc[m][1];
+    const cw=confW[m].length?confW[m].reduce((x,y)=>x+y,0)/confW[m].length:0;
+    return `<span class="kpi"><span class="v">${(a*100).toFixed(0)}%</span><span class="l">${MODEL_LABEL[m]} batch acc</span></span>
+            <span class="kpi"><span class="v">${(cw*100).toFixed(0)}%</span><span class="l">${MODEL_LABEL[m]} conf when wrong</span></span>`;
+  }).join("");
+}
+document.querySelectorAll("input[name=pert]").forEach(r=>r.onchange=runStress);
+["occlSize","dx","dy"].forEach(id=>$("#"+id).oninput=runStress);
+$("#stressReseed").onclick=()=>{stressBatch=pickBatch(24);runStress();};
+
+/* ---------- import ---------- */
+let importPx=null;
+$("#imgDrop").onclick=()=>$("#imgFile").click();
+$("#imgDrop").ondragover=e=>{e.preventDefault();};
+$("#imgDrop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])loadImg(e.dataTransfer.files[0]);};
+$("#imgFile").onchange=e=>{if(e.target.files[0])loadImg(e.target.files[0]);};
+function loadImg(file){
+  const img=new Image();
+  img.onload=()=>{
+    const off=document.createElement("canvas");off.width=28;off.height=28;
+    const ctx=off.getContext("2d");
+    // center-crop square then scale
+    const s=Math.min(img.width,img.height);
+    ctx.drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,28,28);
+    const d=ctx.getImageData(0,0,28,28).data;
+    const inv=$("#invert").checked;
+    importPx=new Float32Array(784);
+    for(let i=0;i<784;i++){
+      let v=(0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2])/255;
+      if(inv)v=1-v;
+      importPx[i]=v;
+    }
+    $("#imgCtl").style.display="flex";
+    drawPixels($("#importPreview"),importPx,112);
+    $("#importResult").innerHTML="";
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+}
+$("#invert").onchange=()=>{if($("#imgFile").files[0])loadImg($("#imgFile").files[0]);};
+$("#runImport").onclick=()=>{
+  if(!importPx)return;
+  let html="";
+  for(const m of ["lr","cnn","cnn_aug"]){
+    const r=FSInference.predict(MODELS[m],importPx);
+    html+=`<span class="kpi"><span class="v">${CLASSES[r.pred]}</span><span class="l">${MODEL_LABEL[m]} · ${(r.conf*100).toFixed(1)}% conf</span></span>`;
+    addHist("image",`${MODEL_LABEL[m]} → ${CLASSES[r.pred]} (${(r.conf*100).toFixed(1)}%)`);
+  }
+  $("#importResult").innerHTML=html;
+};
+$("#csvDrop").onclick=()=>$("#csvFile").click();
+$("#csvDrop").ondragover=e=>{e.preventDefault();};
+$("#csvDrop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])loadCsv(e.dataTransfer.files[0]);};
+$("#csvFile").onchange=e=>{if(e.target.files[0])loadCsv(e.target.files[0]);};
+function loadCsv(file){
+  $("#csvErr").innerHTML="";$("#csvResult").innerHTML="";
+  if(file.size>20*1024*1024){$("#csvErr").innerHTML=`<div class="err">File too large (${(file.size/1048576).toFixed(1)} MB). Limit is 20 MB.</div>`;return;}
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const lines=rd.result.split(/\r?\n/).filter(l=>l.trim().length);
+      if(!lines.length)throw "Empty file.";
+      let start=0;
+      if(/[a-zA-Z]/.test(lines[0].split(",")[1]||""))start=1; // header row
+      const rows=[];const errs=[];
+      for(let i=start;i<lines.length&&rows.length<2000;i++){
+        const parts=lines[i].split(",").map(s=>s.trim());
+        if(parts.length!==784&&parts.length!==785){errs.push(`row ${i+1}: ${parts.length} columns, expected 784 pixels (+ optional label)`);continue;}
+        const px=parts.slice(0,784).map(Number);
+        if(px.some(v=>!isFinite(v)||v<0||v>255)){errs.push(`row ${i+1}: pixel values must be numbers in 0–255`);continue;}
+        let label=null;
+        if(parts.length===785){label=Number(parts[784]);if(!Number.isInteger(label)||label<0||label>9){errs.push(`row ${i+1}: label must be an integer 0–9`);continue;}}
+        rows.push({px:Float32Array.from(px.map(v=>v/255)),label});
+      }
+      if(!rows.length)throw "No valid rows. "+(errs[0]||"");
+      if(errs.length)$("#csvErr").innerHTML=`<div class="err">Skipped ${errs.length} bad row(s), e.g.\n${errs.slice(0,3).join("\n")}</div>`;
+      let html=`<table><thead><tr><th>#</th><th>Image</th><th>LR</th><th>CNN</th><th>CNN+aug</th>${rows[0].label!=null?"<th>Truth</th>":""}</tr></thead><tbody>`;
+      let agree=[0,0,0],nLab=0;
+      rows.slice(0,50).forEach((r,i)=>{
+        const rs=["lr","cnn","cnn_aug"].map(m=>FSInference.predict(MODELS[m],r.px));
+        if(r.label!=null){nLab++;rs.forEach((x,j)=>{if(x.pred===r.label)agree[j]++;});}
+        html+=`<tr><td>${i+1}</td><td><canvas data-row="${i}" width="28" height="28" style="image-rendering:pixelated"></canvas></td>${rs.map(x=>`<td${r.label!=null?(x.pred===r.label?' style="color:var(--good)"':' style="color:var(--bad)"'):""}>${CLASSES[x.pred]} ${(x.conf*100).toFixed(0)}%</td>`).join("")}${r.label!=null?`<td>${CLASSES[r.label]}</td>`:""}</tr>`;
+      });
+      html+="</tbody></table>";
+      if(nLab)html=`<p class="muted">Accuracy on labeled rows: LR ${(100*agree[0]/nLab).toFixed(1)}% · CNN ${(100*agree[1]/nLab).toFixed(1)}% · CNN+aug ${(100*agree[2]/nLab).toFixed(1)}% (of ${nLab})</p>`+html;
+      if(rows.length>50)html=`<p class="muted">Showing first 50 of ${rows.length} rows.</p>`+html;
+      $("#csvResult").innerHTML=html;
+      document.querySelectorAll("#csvResult canvas").forEach(cv=>{drawPixels(cv,rows[+cv.dataset.row].px,28);cv.style.width="28px";cv.style.height="28px";});
+      addHist("csv",`${rows.length} rows scored${nLab?`, CNN+aug ${(100*agree[2]/nLab).toFixed(0)}% acc`:""}`);
+    }catch(e){$("#csvErr").innerHTML=`<div class="err">${e}</div>`;}
+  };
+  rd.readAsText(file);
+}
+function addHist(kind,detail){
+  const h=JSON.parse(localStorage.getItem("fs_hist")||"[]");
+  h.unshift({t:new Date().toLocaleString(),kind,detail});
+  localStorage.setItem("fs_hist",JSON.stringify(h.slice(0,30)));
+  renderHist();
+}
+function renderHist(){
+  const h=JSON.parse(localStorage.getItem("fs_hist")||"[]");
+  $("#histTable tbody").innerHTML=h.map(x=>`<tr><td>${x.t}</td><td>${x.kind}</td><td>${x.detail}</td></tr>`).join("");
+}
+$("#clearHist").onclick=()=>{localStorage.removeItem("fs_hist");renderHist();};
+
+/* ---------- model card ---------- */
+function buildCard(){
+  const M=DATA.metrics;
+  let s=`# FashionShift — model card\n\n`;
+  s+=`Benchmark: Fashion-MNIST (Zalando Research, MIT license). 50,000 train / 10,000 validation split of the official training set (seed 20261116); the official 10,000-image test set was never used for training or model selection.\n\n`;
+  s+=`## Models\n\n| Model | Accuracy | Macro F1 | NLL | Brier | ECE | Params |\n|---|---|---|---|---|---|---|\n`;
+  for(const m of ["lr","cnn","cnn_aug"]){const r=M.models[m];
+    s+=`| ${MODEL_LABEL[m]} | ${fmt(r.accuracy)} | ${fmt(r.macro_f1)} | ${fmt(r.nll)} | ${fmt(r.brier)} | ${fmt(r.ece)} | ${(r.params||0).toLocaleString()} |\n`;}
+  s+=`\n## Stress audit (full 10k test set, seeded)\n\n| Perturbation | Model | Accuracy | Macro F1 | Conf (correct) | Conf (wrong) |\n|---|---|---|---|---|---|\n`;
+  const P={blur:"Blur 3x3",occlusion:"Occlusion 8x8",translation:"Translation +/-4px"};
+  for(const sn of ["blur","occlusion","translation"])for(const m of ["lr","cnn","cnn_aug"]){const r=M.stress[sn][m];
+    s+=`| ${P[sn]} | ${MODEL_LABEL[m]} | ${fmt(r.accuracy)} | ${fmt(r.macro_f1)} | ${fmt(r.mean_confidence_correct,3)} | ${fmt(r.mean_confidence_wrong,3)} |\n`;}
+  s+=`\n## Honest limitations\n\n`;
+  s+=`- Ten classes of 28x28 grayscale catalog clothing photos only. Not validated on real phone photos, drawings, or other garments; do not use as a shopping or recommendation tool.\n`;
+  s+=`- Augmentation buys translation robustness but costs clean accuracy and does not help under blur or occlusion here.\n`;
+  s+=`- Confidence stays high when models are wrong under stress; abstaining on confidence alone is not a shift detector.\n`;
+  s+=`- Shirt / T-shirt-top / Pullover remain the weak classes in every model.\n`;
+  s+=`\nBuilt with AI assistance (disclosed). Training: PyTorch. In-browser inference: hand-written JS, parity-tested against PyTorch.\n`;
+  return s;
+}
+$("#dlMd").onclick=()=>{
+  const blob=new Blob([buildCard()],{type:"text/markdown"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="model_card.md";a.click();
+};
+$("#dlJson").onclick=()=>{
+  const blob=new Blob([JSON.stringify(DATA.metrics,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="metrics.json";a.click();
+};
+
+/* ---------- boot ---------- */
+batch=pickBatch(24);renderBench();renderHist();
+if(location.hash){const b=document.querySelector(`.tabs button[data-tab="${location.hash.slice(1)}"]`);if(b)b.click();}
+$("#cardMd").textContent=buildCard();
+</script>
+</body>
+</html>
